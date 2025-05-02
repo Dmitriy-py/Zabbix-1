@@ -107,3 +107,9 @@ echo "ServerName localhost" | sudo tee -a /etc/apache2/apache2.conf
 # Перезапуск сервисов
 systemctl restart apache2 zabbix-server
 ```
+
+![Снимок экрана (956)](https://github.com/user-attachments/assets/c4674fb0-2e3e-4dce-bae1-dfdb77e13419)
+
+
+
+
