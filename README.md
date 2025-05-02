@@ -21,7 +21,7 @@ Vagrantfile:
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-HOST_NAME = 'zabbix'
+HOST_NAME = 'zabbix-test'
 HOST_IP = '192.168.0.127'
 HOST_USER = 'test'
 HOST_USER_PASS = '123456789'
@@ -51,4 +51,59 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", path: HOST_CONFIIG_SCRIPT, args: [HOST_USER, HOST_USER_PASS, ZABBIX_DB_PASS, HOST_UPGRADE]
 end
 
+```
+
+
+zabbix-server-ubuntu.sh
+
+```
+#!/bin/bash
+set -e
+
+# Аргументы
+USER=$1
+PASS=$2
+DB_PASS=$3
+UPGRADE=$4
+
+# Обновление системы
+if [ "$UPGRADE" == "true" ]; then
+  apt update -y
+  apt dist-upgrade -y
+fi
+
+# Установка PostgreSQL
+apt install postgresql -y
+
+# Настройка репозитория Zabbix
+wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-1+ubuntu22.04_all.deb
+dpkg -i zabbix-release_7.0-1+ubuntu22.04_all.deb
+apt update -y
+
+# Установка Zabbix server
+apt install zabbix-server-pgsql zabbix-frontend-php php8.1-pgsql zabbix-apache-conf zabbix-sql-scripts apache2 -y
+
+# Создание пользователя базы данных Zabbix
+sudo -u postgres psql --command "CREATE USER zabbix WITH PASSWORD '$DB_PASS';"
+
+# Создание базы данных Zabbix
+sudo -u postgres psql --command "CREATE DATABASE zabbix OWNER zabbix;"
+
+# Импорт схемы базы данных
+zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | sudo -u zabbix psql zabbix
+
+# Настройка Zabbix server
+sed -i "s/^DBPassword=.*/DBPassword=$DB_PASS/" /etc/zabbix/zabbix_server.conf
+
+# Настройка временной зоны в PHP
+sed -i "s/;date.timezone =.*/date.timezone = Europe\/Moscow/" /etc/php/8.1/apache2/php.ini
+
+# Настройка веб-интерфейса
+ln -s /etc/zabbix/apache.conf /etc/apache2/sites-available/zabbix.conf
+a2ensite zabbix
+apachectl configtest
+echo "ServerName localhost" | sudo tee -a /etc/apache2/apache2.conf
+
+# Перезапуск сервисов
+systemctl restart apache2 zabbix-server
 ```
